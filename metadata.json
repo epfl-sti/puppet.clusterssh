@@ -1,0 +1,14 @@
+{
+  "name": "domq-ssh_netgroup",
+  "version": "0.0.1",
+  "author": "domq",
+  "summary": "Autogenerate netgroup and shosts.equiv data from Foreman facts",
+  "license": "MIT",
+  "source": "https://github.com/epfl-sti/puppet.ssh_netgroup",
+  "project_page": "https://github.com/epfl-sti/puppet.ssh_netgroup",
+  "issues_url": "https://github.com/epfl-sti/puppet.ssh_netgroup/issues",
+  "dependencies": [
+    {"version_requirement":">= 1.0.0","name":"puppetlabs-stdlib"}
+  ]
+}
+
