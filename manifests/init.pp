@@ -1,4 +1,4 @@
-# == Class: ssh_netgroup
+# == Class: clusterssh
 #
 # Full description of class ssh_netgroup here.
 #
@@ -31,11 +31,8 @@
 #
 # Author Name <author@domain.com>
 #
-# === Copyright
-#
-# Copyright 2015 Your name here, unless otherwise noted.
-#
-class ssh_netgroup {
+class clusterssh(
+  $role = "autodetect",
 
 
 }

@@ -1,13 +1,13 @@
-# ssh_netgroup
+# clusterssh
 
 #### Table of Contents
 
 1. [Overview](#overview)
 2. [Module Description - What the module does and why it is useful](#module-description)
-3. [Setup - The basics of getting started with ssh_netgroup](#setup)
-    * [What ssh_netgroup affects](#what-ssh_netgroup-affects)
+3. [Setup - The basics of getting started with clusterssh](#setup)
+    * [What clusterssh affects](#what-clusterssh-affects)
     * [Setup requirements](#setup-requirements)
-    * [Beginning with ssh_netgroup](#beginning-with-ssh_netgroup)
+    * [Beginning with clusterssh](#beginning-with-clusterssh)
 4. [Usage - Configuration options and additional functionality](#usage)
 5. [Reference - An under-the-hood peek at what the module is doing and how](#reference)
 5. [Limitations - OS compatibility, etc.](#limitations)
@@ -31,7 +31,7 @@ management, etc.) this is the time to mention it.
 
 ## Setup
 
-### What ssh_netgroup affects
+### What clusterssh affects
 
 * A list of files, packages, services, or operations that the module will alter,
   impact, or execute on the system it's installed on.
@@ -43,7 +43,7 @@ management, etc.) this is the time to mention it.
 If your module requires anything extra before setting up (pluginsync enabled,
 etc.), mention it here.
 
-### Beginning with ssh_netgroup
+### Beginning with clusterssh
 
 The very basic steps needed for a user to get the module up and running.
 
