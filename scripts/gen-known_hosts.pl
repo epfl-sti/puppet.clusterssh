@@ -64,6 +64,8 @@ while(<U_CAN_TOUCH_THIS>) {
   }
 
   # The Puppet master might have an alias on the internal network.
+  # TODO: using hammer --search ipaddr, we could drop the assumption
+  # that only the Puppet master can be multi-homed.
   if ($fqdn eq $puppetmaster_fqdn) {
     open(FACTER, "facter |") or die "facter doesn't deliver: $!";
     while(<FACTER>) {
