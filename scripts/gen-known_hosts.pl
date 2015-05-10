@@ -32,7 +32,8 @@ if (! defined $ENV{HOME}) {
 
 do {
   open(U_CAN_TOUCH_THIS,
-     "hammer --output csv fact list --search sshrsakey  --per-page 1000 |");
+     "hammer --output csv fact list --search sshrsakey  --per-page 1000 |" .
+       " sort |");
   defined(<U_CAN_TOUCH_THIS>);  # Skip header
 } or die "Stop! No hammertime: $!";
 
