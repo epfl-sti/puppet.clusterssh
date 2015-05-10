@@ -10,6 +10,10 @@
 # [*manage_nsswitch_netgroup*] 
 #   Whether to manage the netgroup entry in nsswitch.conf.
 #   Set to false to let e.g. domq/epfl_sso set this entry.
+# [*manage_pdsh_packages*] 
+#   Whether to manage the installation of pdsh and pdsh-mod-netgroup.
+#   Set this to false if you manage this packages by yourself, or if
+#   you don't want to install pdsh.
 #
 # === Actions:
 # * Runs hammer (Foreman's CLI) on the Puppet master to enumerate known hosts
@@ -18,9 +22,11 @@
 class clusterssh(
   $role = "autodetect",
   $manage_nsswitch_netgroup = true,
+  $manage_pdsh_packages = true,
 ) {
   validate_re($role, '^agent$|^puppetmaster$|^autodetect$')
   validate_bool($manage_nsswitch_netgroup)
+  validate_bool($manage_pdsh_packages)
 
   if ($role == "autodetect") {
     if ($::has_hammer) {
@@ -62,4 +68,8 @@ class clusterssh(
     }
   }
 
+  if ($manage_pdsh_packages) {
+    ensure_resource("package", ["pdsh", "pdsh-mod-netgroup"],
+                    { ensure => 'installed'})
+  }  
 }
