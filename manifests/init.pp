@@ -31,13 +31,11 @@ class clusterssh(
     # Bag of ugly quirks to do the simplest thing, in spite of Puppet
     # trying to prevent it: create a config file from a script.
     #
-    # * We need a custom function to figure out the path of the script in the
-    #   first place
     # * Put the output in the source tree of the module (under files/), it being the
     #   only place where it can be downloaded from on slave nodes
     # * trick exec() into not knowing that the script runs every time (otherwise
     #   the master node would never go green again in the Foreman dashboard)
-    $module_path = module_path("clusterssh")
+    $module_path = get_module_path("clusterssh")
     exec { "/bin/false # clusterssh gen-known_hosts.pl":
       unless => "${module_path}/scripts/gen-known_hosts.pl -o ${module_path}/files/generated/known_hosts",
     }
