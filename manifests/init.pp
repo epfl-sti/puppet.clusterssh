@@ -28,8 +28,8 @@ class clusterssh(
   }
 
   if ($resolved_role == "puppetmaster") {
-    # Bag of ugly quirks to do the simplest thing, in spite of Puppet
-    # trying to prevent it: create a config file from a script.
+    # Bag of ugly tricks to do the simplest thing, despite the efforts
+    # of Puppet to prevent it: create a config file from a script.
     #
     # * Put the output in the source tree of the module (under files/), it being the
     #   only place where it can be downloaded from on slave nodes
