@@ -1,4 +1,7 @@
+# This is a bunch of useful things destined to be 'include'd.
 class clusterssh::private {
+  # For namespacing only; this class performs no action.
+
   # Sync a file from <modulepath_of_clusterssh>/files/generated/ to any path.
   #
   # Usage example:
