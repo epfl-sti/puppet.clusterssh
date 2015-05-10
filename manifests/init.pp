@@ -49,13 +49,13 @@ class clusterssh(
     #
     $module_path = get_module_path("clusterssh")
     exec { "/bin/false # clusterssh gen-known_hosts.pl":
-      unless => "${module_path}/scripts/gen-known_hosts.pl -o ${module_path}/files/generated/known_hosts",
+      unless => "${module_path}/scripts/gen-known_hosts.pl -o ${module_path}/files/generated/ssh_known_hosts",
     }
   }
 
   include('clusterssh::private')
-  clusterssh::private::sync_file_from_puppetmaster { "known_hosts":
-    path => "/etc/ssh/known_hosts"
+  clusterssh::private::sync_file_from_puppetmaster { "ssh_known_hosts":
+    path => "/etc/ssh/ssh_known_hosts"
   }
   clusterssh::private::sync_file_from_puppetmaster { "netgroup":
     path => "/etc/netgroup"

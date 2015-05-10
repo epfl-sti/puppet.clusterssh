@@ -4,7 +4,7 @@ use strict;
 
 =head1 NAME
 
-gen-known_hosts.pl - Create the ssh known_hosts file from fact data in Foreman
+gen-known_hosts.pl - Create the ssh_known_hosts file from fact data in Foreman
 
 =head1 SYNOPSIS
 
@@ -45,20 +45,24 @@ GetOptions("o=s" => sub {
   open(STDOUT, ">", $outputfile) or
     die "Cannot open $outputfile for writing: $!";
 });
-sub fatal_cannot_write {
-  if ($outputfile) {
-    die "Cannot write to $outputfile: $!";
-    unlink($outputfile);
-  } else {
-    die "Cannot write to standard output: $!";
-  }
+
+END {
+  unlink($outputfile) if ($? &&$outputfile);
 }
 
 while(<U_CAN_TOUCH_THIS>) {
   chomp;
   my ($fqdn, undef, $pubkey) = split m/,/;
-  print "$fqdn ssh-rsa $pubkey\n" or fatal_cannot_write;
+  my ($hostname) = ($fqdn =~ m|^(.*?)\.|);
+  open(HOST, "env - /usr/bin/host '$fqdn' |") or die "Cannot run host: $!";
+  my @aliases = ($fqdn, $hostname);
+  while(<HOST>) {
+    m/has address ([0-9.]+)/ && push(@aliases, $1);
+    m/has IPv6 address ([0-9:]+)/ && push(@aliases, "[$1]");
+  }
+  my $aliases = join(",", @aliases);
+  print "$aliases ssh-rsa $pubkey\n" or die "Cannot write: $!";
 }
 
-close(STDOUT) or fatal_cannot_write;
+close(STDOUT) or die "Cannot close: $!";
 exit 0;
