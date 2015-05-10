@@ -31,6 +31,22 @@ class clusterssh::private {
       warning("${puppet_path} (still?) doesn't exist on Puppet master")
     }
   }
+
+  define set_ssh_config($value = "yes") {
+    ssh_config { "clusterssh ${name} global":
+      ensure => present,
+      key    => $name,
+      value  => $value,
+    }
+  }
+
+  define set_sshd_config($value = "yes") {
+    sshd_config { "clusterssh ${name}":
+      ensure => present,
+      key    => $name,
+      value  => $value,
+    }
+  }
 }
 
 class clusterssh::private::install_pdsh {

@@ -51,6 +51,8 @@ class clusterssh(
     exec { "/bin/false # clusterssh gen-known_hosts.pl":
       unless => "${module_path}/scripts/gen-known_hosts.pl -o ${module_path}/files/generated/ssh_known_hosts",
     }
+
+    # TODO: generate netgroup and shosts.equiv from additional class parameters
   }
 
   include('clusterssh::private')
@@ -59,6 +61,9 @@ class clusterssh(
   }
   clusterssh::private::sync_file_from_puppetmaster { "netgroup":
     path => "/etc/netgroup"
+  }
+  clusterssh::private::sync_file_from_puppetmaster { "shosts.equiv":
+    path => "/etc/ssh/shosts.equiv"
   }
 
   if ($manage_nsswitch_netgroup) {
@@ -70,5 +75,20 @@ class clusterssh(
 
   if ($manage_pdsh_packages) {
     class { "clusterssh::private::install_pdsh": }
+  }
+
+  if ($::operatingsystem == "RedHat") {
+    $sshd_service = "sshd"
+  } else {
+    $sshd_service = "ssh"
+  }
+  ensure_resource("service", $sshd_service, { ensure => 'running'})
+
+  # https://en.wikibooks.org/wiki/OpenSSH/Cookbook/Host-based_Authentication
+  clusterssh::private::set_sshd_config { "HostbasedAuthentication":
+    notify => Service[$sshd_service]
+  }
+  clusterssh::private::set_ssh_config {
+    ["HostbasedAuthentication", "EnableSSHKeysign", "ForwardX11"]:
   }
 }
