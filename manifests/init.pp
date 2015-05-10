@@ -7,6 +7,9 @@
 # [*role*]
 #   Either "agent", "puppetmaster", or "autodetect" (the latter, according
 #   to whether Foreman's hammer tool is installed)
+# [*manage_nsswitch_netgroup*] 
+#   Whether to manage the netgroup entry in nsswitch.conf.
+#   Set to false to let e.g. domq/epfl_sso set this entry.
 #
 # === Actions:
 # * Runs hammer (Foreman's CLI) on the Puppet master to enumerate known hosts
@@ -14,8 +17,10 @@
 #
 class clusterssh(
   $role = "autodetect",
+  $manage_nsswitch_netgroup = true,
 ) {
   validate_re($role, '^agent$|^puppetmaster$|^autodetect$')
+  validate_bool($manage_nsswitch_netgroup)
 
   if ($role == "autodetect") {
     if ($::has_hammer) {
@@ -35,6 +40,7 @@ class clusterssh(
     #   only place where it can be downloaded from on slave nodes
     # * trick exec() into not knowing that the script runs every time (otherwise
     #   the master node would never go green again in the Foreman dashboard)
+    #
     $module_path = get_module_path("clusterssh")
     exec { "/bin/false # clusterssh gen-known_hosts.pl":
       unless => "${module_path}/scripts/gen-known_hosts.pl -o ${module_path}/files/generated/known_hosts",
@@ -48,4 +54,12 @@ class clusterssh(
   clusterssh::private::sync_file_from_puppetmaster { "netgroup":
     path => "/etc/netgroup"
   }
+
+  if ($manage_nsswitch_netgroup) {
+    name_service { 'netgroup':
+      # Who needs a real Yellow Pages service when we have Puppet?
+      lookup => ['files']
+    }
+  }
+
 }

@@ -11,6 +11,10 @@
     {
         "name":"puppetlabs-stdlib",
         "version_requirement":">= 1.0.0"
+    },
+    {
+      "name": "wcooley-name_service",
+      "version_requirement": ">= 0.1.0"
     }
   ]
 }
