@@ -30,6 +30,8 @@ if (! defined $ENV{HOME}) {
   $ENV{HOME} = "/root";
 }
 
+chomp(my $puppetmaster_fqdn = `facter fqdn`);
+
 do {
   open(U_CAN_TOUCH_THIS,
      "hammer --output csv fact list --search sshrsakey  --per-page 1000 |" .
@@ -60,6 +62,25 @@ while(<U_CAN_TOUCH_THIS>) {
     m/has address ([0-9.]+)/ && push(@aliases, $1);
     m/has IPv6 address ([0-9:]+)/ && push(@aliases, "[$1]");
   }
+
+  # The Puppet master might have an alias on the internal network.
+  if ($fqdn eq $puppetmaster_fqdn) {
+    open(FACTER, "facter |") or die "facter doesn't deliver: $!";
+    while(<FACTER>) {
+      chomp;
+      next unless (m/ipaddress.* => ([0-9.]+)/);
+      my $maybe_internal_ip = $1;
+      chomp(my $gethostbyaddr = `getent hosts $maybe_internal_ip`);
+      next unless ($gethostbyaddr =~ m/[0-9.]+ (\S+)/);
+      my $another_fqdn = $1;
+      next if $another_fqdn =~ m/localhost/;
+      next if grep { $_ eq $another_fqdn } @aliases;
+      push @aliases, $maybe_internal_ip, $another_fqdn;
+      my ($another_hostname) = ($another_fqdn =~ m|^(.*?)\.|);
+      push @aliases, $another_hostname;
+    }
+  }
+
   my $aliases = join(",", @aliases);
   print "$aliases ssh-rsa $pubkey\n" or die "Cannot write: $!";
 }
