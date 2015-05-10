@@ -1,8 +1,7 @@
 #
-# module_path.rb
+# exists.rb
 #
-# Dominique Quatravaux: lifted from git://gist.github.com/5312010.git and
-# https://gist.github.com/3307835.git then refactored to taste
+# Dominique Quatravaux: lifted from https://gist.github.com/5312010
 #
 # Copyright 2011 Puppet Labs Inc.
 # Copyright 2011 Krzysztof Wilczynski
@@ -21,57 +20,7 @@
 # limitations under the License.
 #
 
-module Clusterssh
-  def module_path(mod_name)
-    env = compiler.environment.to_s
-    mod = Puppet::Module.find(mod_name, env)
-    raise Puppet::Error, "exists(): invalid module name #{mod_name}" unless mod
-    return mod.path
-  end
-
-  # Returns a path resolved on the Puppet Master.
-  # 
-  # Replace 'puppet://module/<foo>' with the `module_path()` of <foo>,
-  # and return the resulting string.
-  def resolve_puppetmaster_path(path)
-    raise Puppet::ParseError, 'resolve_puppet_master_path(): Requires a string'
-      unless file.is_a?(String)
- 
-    if path.slice!('puppet:///')
-    # Perform relative lookup in modules/files dir.
-        # strip off the modules prefix too if it's there
-        path.slice!('modules/')
-        mod_name, file = file.split(File::SEPARATOR, 2)
-        return File.join(module_path(mod_name), "files", path)
-    else
-        return File.expand_path(path)
-    end
-end
- 
 module Puppet::Parser::Functions
-  newfunction(:module_path, :type => :rvalue, :doc => <<-EOS
-Returns the root path of a given module on the Puppet Master.
-
-Prototype:
-
-    module_path(module_name)
-
-    EOS
-  ) do |arguments|
- 
-    #
-    # This is to ensure that whenever we call this function from within
-    # the Puppet manifest or alternatively from a template it will always
-    # do the right thing ...
-    #
-    arguments = arguments.shift if arguments.first.is_a?(Array)
- 
-    raise Puppet::ParseError, "exists(): Wrong number of arguments " +
-      "given (#{arguments.size} for 1)" if arguments.size < 1
- 
-    return Clusterssh::module_path(arguments.shift)
-  end
-
   newfunction(:exists, :type => :rvalue, :doc => <<-EOS
 Returns an boolean value if a given file and/or directory exists on Puppet Master.
 
@@ -86,7 +35,7 @@ For example:
   Given the following statements:
 
     $a = '/etc/resolv.conf'
-    $b = '/this/does/not/exist'
+    $b = '/this/does/not/exists'
 
     notice exists($a)
     notice exists($b)
@@ -117,11 +66,39 @@ For example:
     exists on the client side.
     EOS
   ) do |arguments|
-     arguments = arguments.shift if arguments.first.is_a?(Array)
+ 
+    #
+    # This is to ensure that whenever we call this function from within
+    # the Puppet manifest or alternatively from a template it will always
+    # do the right thing ...
+    #
+    arguments = arguments.shift if arguments.first.is_a?(Array)
+ 
     raise Puppet::ParseError, "exists(): Wrong number of arguments " +
       "given (#{arguments.size} for 1)" if arguments.size < 1
-    return File.exists?(Clusterssh::resolve_puppetmaster_path(arguments.shift))
+ 
+    file = arguments.shift
+    raise Puppet::ParseError, 'exists(): Requires a string type ' +
+      'to work with' unless file.is_a?(String)
+ 
+    if file.slice!('puppet:///')
+    # Perform relative lookup in modules/files dir.
+        # strip off the modules prefix too if it's there
+        file.slice!('modules/')
+        env = compiler.environment.to_s
+        mod_name, file = file.split(File::SEPARATOR, 2)
+        mod = Puppet::Module.find(mod_name, env)
+        raise Puppet::Error, "exists(): invalid module name #{mod_name}" unless mod
+        path = mod.path
+        file = File.join(path, "files", file)
+    else
+        file = File.expand_path(file)
+    end
+ 
+    result = File.exists?(file)
+ 
   end
+ 
 end
  
 # vim: set ts=2 sw=2 et :
