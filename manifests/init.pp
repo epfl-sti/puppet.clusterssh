@@ -39,7 +39,17 @@ class clusterssh(
     exec { "/bin/false # clusterssh gen-known_hosts.pl":
       unless => "${module_path}/scripts/gen-known_hosts.pl -o ${module_path}/files/generated/known_hosts",
     }
+  }
+  $known_hosts_on_master = "puppet:///modules/clusterssh/generated/known_hosts"
+  # Trick from https://ask.puppetlabs.com/question/5849/check-if-file-exists-on-client/
+  if (inline_template("<% if File.exist?('${module_path}/files/generated/known_hosts') -%>true<% end -%>")) {
+    file { "/etc/ssh/known_hosts":
+      owner => "root",
+      group => "root",
+      mode => "644",
+      source => $known_hosts_on_master
+    }
   } else {
-    warning("agent, doing nothing for now")
+    warning("${known_hosts_on_master} (still?) doesn't exist")
   }
 }
