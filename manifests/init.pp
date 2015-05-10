@@ -1,38 +1,47 @@
 # == Class: clusterssh
 #
-# Full description of class ssh_netgroup here.
+# Set up /etc/netgroup and SSH host-based authentication for pdsh bliss.
 #
 # === Parameters
 #
-# Document parameters here.
+# [*role*]
+#   Either "agent", "puppetmaster", or "autodetect" (the latter, according
+#   to whether Foreman's hammer tool is installed)
 #
-# [*sample_parameter*]
-#   Explanation of what this parameter affects and what it defaults to.
-#   e.g. "Specify one or more upstream ntp servers as an array."
-#
-# === Variables
-#
-# Here you should define a list of variables that this module would require.
-#
-# [*sample_variable*]
-#   Explanation of how this variable affects the funtion of this class and if
-#   it has a default. e.g. "The parameter enc_ntp_servers must be set by the
-#   External Node Classifier as a comma separated list of hostnames." (Note,
-#   global variables should be avoided in favor of class parameters as
-#   of Puppet 2.6.)
-#
-# === Examples
-#
-#  class { 'ssh_netgroup':
-#    servers => [ 'pool.ntp.org', 'ntp.local.company.com' ],
-#  }
-#
-# === Authors
-#
-# Author Name <author@domain.com>
+# === Actions:
+# * Runs hammer (Foreman's CLI) on the Puppet master to enumerate known hosts
+# * Creates known_hosts file inside this module's files/ directory
 #
 class clusterssh(
   $role = "autodetect",
+) {
+  validate_re($role, '^agent$|^puppetmaster$|^autodetect$')
 
+  if ($role == "autodetect") {
+    if ($::has_hammer) {
+      $resolved_role = "puppetmaster"
+    } else {
+      $resolved_role = "agent"
+    }
+  } else {
+    $resolved_role = $role
+  }
 
+  if ($resolved_role == "puppetmaster") {
+    # Bag of ugly quirks to do the simplest thing, in spite of Puppet
+    # trying to prevent it: create a config file from a script.
+    #
+    # * We need a custom function to figure out the path of the script in the
+    #   first place
+    # * Put the output in the source tree of the module (under files/), it being the
+    #   only place where it can be downloaded from on slave nodes
+    # * trick exec() into not knowing that the script runs every time (otherwise
+    #   the master node would never go green again in the Foreman dashboard)
+    $module_path = module_path("clusterssh")
+    exec { "/bin/false # clusterssh gen-known_hosts.pl":
+      unless => "${module_path}/scripts/gen-known_hosts.pl -o ${module_path}/files/generated/known_hosts",
+    }
+  } else {
+    warning("agent, doing nothing for now")
+  }
 }
