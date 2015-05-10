@@ -29,3 +29,15 @@ class clusterssh::private {
     }
   }
 }
+
+class clusterssh::private::install_pdsh {
+  if ($::operatingsystem == "RedHat") {
+    ensure_resource("package", "pdsh", { ensure => 'installed'})
+    if ($operatingsystemrelease == "6.6") {
+      # pdsh has no netgroup support in RHEL 6.5 :-(
+      # TODO: pdsh -g still works, but apparently uses the config from "dsh"
+      # (https://rtcamp.com/tutorials/linux/dsh/).  We could support that too.
+      ensure_resource("package", "pdsh-mod-netgroup", { ensure => 'installed'})
+    }
+  }
+}

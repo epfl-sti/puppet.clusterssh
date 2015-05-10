@@ -29,7 +29,7 @@ class clusterssh(
   validate_bool($manage_pdsh_packages)
 
   if ($role == "autodetect") {
-    if ($::has_hammer) {
+    if ($::has_hammer == "true") {
       $resolved_role = "puppetmaster"
     } else {
       $resolved_role = "agent"
@@ -69,7 +69,6 @@ class clusterssh(
   }
 
   if ($manage_pdsh_packages) {
-    ensure_resource("package", ["pdsh", "pdsh-mod-netgroup"],
-                    { ensure => 'installed'})
-  }  
+    class { "clusterssh::private::install_pdsh": }
+  }
 }
