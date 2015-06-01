@@ -11,6 +11,7 @@ class clusterssh::private {
   #   }
   #
   define sync_file_from_puppetmaster(
+    $filename = $name,
     $path = undef,
     $owner = "root",
     $group = "root",
@@ -18,9 +19,9 @@ class clusterssh::private {
     ) {
     validate_string($path)
     $module_path = get_module_path("clusterssh")
-    $puppet_path = "puppet:///modules/clusterssh/generated/${name}"
+    $puppet_path = "puppet:///modules/clusterssh/generated/${filename}"
     # Trick from https://ask.puppetlabs.com/question/5849/check-if-file-exists-on-client/
-    if (inline_template("<% if File.exist?('${module_path}/files/generated/${name}') -%>true<% end -%>")) {
+    if (inline_template("<% if File.exist?('${module_path}/files/generated/${filename}') -%>true<% end -%>")) {
       file { $path:
         owner => $owner,
         group => $group,

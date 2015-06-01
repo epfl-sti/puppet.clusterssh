@@ -14,15 +14,21 @@
 #   Whether to manage the installation of pdsh and pdsh-mod-netgroup.
 #   Set this to false if you manage this packages by yourself, or if
 #   you don't want to install pdsh.
+# [*enable_root_shosts_equiv*] 
+#   Boolean, whether to allow root to log in from one node to another
+#   without providing a password.
 #
 # === Actions:
 # * Runs hammer (Foreman's CLI) on the Puppet master to enumerate known hosts
-# * Creates known_hosts file inside this module's files/ directory
+# * Creates known_hosts and shosts.equiv file inside this module's files/generated
+#   directory on the puppetmaster
+# * Distributes these files (plus netgroup if present) onto all slaves
 #
 class clusterssh(
   $role = "autodetect",
   $manage_nsswitch_netgroup = true,
   $manage_pdsh_packages = true,
+  $enable_root_shosts_equiv = true
 ) {
   validate_re($role, '^agent$|^puppetmaster$|^autodetect$')
   validate_bool($manage_nsswitch_netgroup)
@@ -93,5 +99,16 @@ class clusterssh(
   }
   clusterssh::private::set_ssh_config {
     ["HostbasedAuthentication", "EnableSSHKeysign", "ForwardX11"]:
+  }
+  if ($enable_root_shosts_equiv) {
+    # http://brandonhutchinson.com/wiki/Ssh_HostbasedAuthentication#HostbasedAuthentication_with_the_root_user
+    clusterssh::private::set_sshd_config { "IgnoreRhosts":
+      value => "no",
+      notify => Service[$sshd_service]
+    }
+    clusterssh::private::sync_file_from_puppetmaster { "/root/.shosts":
+      filename => "shosts.equiv",
+      path => "/root/.shosts"
+    }
   }
 }
