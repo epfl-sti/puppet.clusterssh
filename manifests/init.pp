@@ -77,7 +77,7 @@ class clusterssh(
     class { "clusterssh::private::install_pdsh": }
   }
 
-  if ($::operatingsystem == "RedHat") {
+  if ($::operatingsystem == "RedHat" or $::operatingsystem == "CentOS") {
     $sshd_service = "sshd"
   } else {
     $sshd_service = "ssh"
