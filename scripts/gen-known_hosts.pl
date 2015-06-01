@@ -19,12 +19,17 @@ format.
 =cut
 
 use Getopt::Long;
+use Carp qw(carp);
 
 # Attempt to save stderr somewhere - No biggie if that fails
 open(STDERR, "> /var/log/puppet/gen-known_hosts.log");
 
-my $now = localtime(time);
-warn "[$now] Running $0 " . join(" ", @ARGV);
+sub logmsg {
+  my $now = localtime(time);
+  carp "[$now] $_[0]";
+}
+
+logmsg "Running " . join(" ", @ARGV);
 
 if (! defined $ENV{HOME}) {
   $ENV{HOME} = "/root";
@@ -36,14 +41,13 @@ do {
   open(U_CAN_TOUCH_THIS,
      "hammer --output csv fact list --search sshrsakey  --per-page 1000 |" .
        " sort |");
-  defined(<U_CAN_TOUCH_THIS>);  # Skip header
 } or die "Stop! No hammertime: $!";
 
 # Redirect only now, so that the file doesn't get created in case of failure
 our $outputfile;
 GetOptions("o=s" => sub {
   (undef, $outputfile) = @_;
-  warn "Redirecting to $outputfile";
+  logmsg "Redirecting to $outputfile";
   open(STDOUT, ">", $outputfile) or
     die "Cannot open $outputfile for writing: $!";
 });
@@ -54,14 +58,18 @@ END {
 
 while(<U_CAN_TOUCH_THIS>) {
   chomp;
+  next if m/,Fact,/;  # Header line
   my ($fqdn, undef, $pubkey) = split m/,/;
   my ($hostname) = ($fqdn =~ m|^(.*?)\.|);
-  open(HOST, "env - /usr/bin/host '$fqdn' |") or die "Cannot run host: $!";
+  my $cmd = "env - /usr/bin/host '$fqdn' |";
+  open(HOST, $cmd) or die "Cannot run '$cmd': $!";
   my @aliases = ($fqdn, $hostname);
   while(<HOST>) {
     m/has address ([0-9.]+)/ && push(@aliases, $1);
     m/has IPv6 address ([0-9:]+)/ && push(@aliases, "[$1]");
   }
+  close(HOST);
+  $? && die "$cmd failed with code $?";
 
   # The Puppet master might have an alias on the internal network.
   # TODO: using hammer --search ipaddr, we could drop the assumption
