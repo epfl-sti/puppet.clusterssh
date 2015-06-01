@@ -1,6 +1,6 @@
 {
   "name": "domq-clusterssh",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "author": "domq",
   "summary": "ssh from anywhere to anywhere in the Puppet cluster",
   "license": "MIT",
