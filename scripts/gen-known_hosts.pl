@@ -13,7 +13,7 @@ gen-known_hosts.pl - Create the ssh_known_hosts file from fact data in Foreman
 =head1 DESCRIPTION
 
 This script collects the C<sshrsakey> facts from Foreman (using the
-C<hammer> CLI tool) and processes them into OpenSSh's C<known_hosts>
+C<hammer> CLI tool) and processes them into OpenSSH's C<known_hosts>
 format.
 
 =cut
@@ -53,7 +53,7 @@ GetOptions("o=s" => sub {
 });
 
 END {
-  unlink($outputfile) if ($? &&$outputfile);
+  unlink($outputfile) if ($? && $outputfile);
 }
 
 while(<U_CAN_TOUCH_THIS>) {
