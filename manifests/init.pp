@@ -50,9 +50,12 @@ class clusterssh(
     $module_path = get_module_path("clusterssh")
     exec { "/bin/false # clusterssh gen-known_hosts.pl":
       unless => "${module_path}/scripts/gen-known_hosts.pl -o ${module_path}/files/generated/ssh_known_hosts",
+    } ->
+    exec { "/bin/false # clusterssh gen-shosts_equiv.pl":
+      unless => "${module_path}/scripts/gen-shosts_equiv.pl -i ${module_path}/files/generated/ssh_known_hosts -o ${module_path}/files/generated/shosts.equiv",
     }
 
-    # TODO: generate netgroup and shosts.equiv from additional class parameters
+    # TODO: generate netgroup file too (requires additional class parameters)
   }
 
   include('clusterssh::private')
@@ -77,7 +80,7 @@ class clusterssh(
     class { "clusterssh::private::install_pdsh": }
   }
 
-  if ($::operatingsystem == "RedHat") {
+  if ($::operatingsystem == "RedHat" or $::operatingsystem == "CentOS") {
     $sshd_service = "sshd"
   } else {
     $sshd_service = "ssh"

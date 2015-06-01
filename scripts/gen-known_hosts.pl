@@ -13,7 +13,7 @@ gen-known_hosts.pl - Create the ssh_known_hosts file from fact data in Foreman
 =head1 DESCRIPTION
 
 This script collects the C<sshrsakey> facts from Foreman (using the
-C<hammer> CLI tool) and processes them into OpenSSh's C<known_hosts>
+C<hammer> CLI tool) and processes them into OpenSSH's C<known_hosts>
 format.
 
 =cut
@@ -53,7 +53,7 @@ GetOptions("o=s" => sub {
 });
 
 END {
-  unlink($outputfile) if ($? &&$outputfile);
+  unlink($outputfile) if ($? && $outputfile);
 }
 
 while(<U_CAN_TOUCH_THIS>) {
@@ -78,10 +78,13 @@ while(<U_CAN_TOUCH_THIS>) {
     open(FACTER, "facter |") or die "facter doesn't deliver: $!";
     while(<FACTER>) {
       chomp;
-      next unless (m/ipaddress.* => ([0-9.]+)/);
+      next unless (m/ipaddress.* => ((?:[0-9]+[.]){3}[0-9]+)/);
       my $maybe_internal_ip = $1;
       chomp(my $gethostbyaddr = `getent hosts $maybe_internal_ip`);
-      next unless ($gethostbyaddr =~ m/[0-9.]+ (\S+)/);
+      unless ($gethostbyaddr =~ m/[0-9.]+\s+(\S+)/) {
+        logmsg "Unable to getent hosts $maybe_internal_ip (result: $gethostbyaddr)";
+        next;
+      };
       my $another_fqdn = $1;
       next if $another_fqdn =~ m/localhost/;
       next if grep { $_ eq $another_fqdn } @aliases;
