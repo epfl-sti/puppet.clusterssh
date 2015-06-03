@@ -35,18 +35,19 @@ if (! defined $ENV{HOME}) {
 }
 
 # Redirect only now, so that the file doesn't get created in case of failure
-our ($inputfile, $outputfile);
+our ($inputfile, $outputfile, $outputfile_unique);
 GetOptions(
   "i=s" => \$inputfile,
   "o=s" => sub {
   (undef, $outputfile) = @_;
-  logmsg "Redirecting to $outputfile";
-  open(STDOUT, ">", $outputfile) or
-    die "Cannot open $outputfile for writing: $!";
+  $outputfile_unique = "${outputfile}.$$";
+  logmsg "Redirecting to $outputfile_unique";
+  open(STDOUT, ">", $outputfile_unique) or
+    die "Cannot open $outputfile_unique for writing: $!";
 });
 
 END {
-  unlink($outputfile) if ($? && $outputfile);
+  unlink($outputfile_unique) if ($? && $outputfile_unique);
 }
 
 die "-i flag is required" unless $inputfile;
@@ -61,4 +62,6 @@ while(<INPUT>) {
 }
 
 close(STDOUT) or die "Cannot close: $!";
+rename($outputfile_unique, $outputfile) or
+  die "Cannot rename $outputfile_unique to $outputfile: $!";
 exit 0;

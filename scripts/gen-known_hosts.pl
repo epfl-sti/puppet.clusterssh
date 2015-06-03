@@ -44,16 +44,17 @@ do {
 } or die "Stop! No hammertime: $!";
 
 # Redirect only now, so that the file doesn't get created in case of failure
-our $outputfile;
+our ($outputfile, $outputfile_unique);
 GetOptions("o=s" => sub {
   (undef, $outputfile) = @_;
-  logmsg "Redirecting to $outputfile";
-  open(STDOUT, ">", $outputfile) or
-    die "Cannot open $outputfile for writing: $!";
+  $outputfile_unique = "${outputfile}.$$";
+  logmsg "Redirecting to $outputfile_unique";
+  open(STDOUT, ">", $outputfile_unique) or
+    die "Cannot open $outputfile_unique for writing: $!";
 });
 
 END {
-  unlink($outputfile) if ($? && $outputfile);
+  unlink($outputfile_unique) if ($? && $outputfile_unique);
 }
 
 while(<U_CAN_TOUCH_THIS>) {
@@ -99,4 +100,6 @@ while(<U_CAN_TOUCH_THIS>) {
 }
 
 close(STDOUT) or die "Cannot close: $!";
+rename($outputfile_unique, $outputfile) or
+  die "Cannot rename $outputfile_unique to $outputfile: $!";
 exit 0;
