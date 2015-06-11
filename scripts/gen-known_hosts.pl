@@ -39,7 +39,7 @@ chomp(my $puppetmaster_fqdn = `facter fqdn`);
 
 do {
   open(U_CAN_TOUCH_THIS,
-     "hammer --output csv fact list --search sshrsakey  --per-page 1000 |" .
+     "hammer --output csv fact list --search ssh --search key --per-page 1000 |" .
        " sort |");
 } or die "Stop! No hammertime: $!";
 
@@ -59,7 +59,8 @@ END {
 while(<U_CAN_TOUCH_THIS>) {
   chomp;
   next if m/,Fact,/;  # Header line
-  my ($fqdn, undef, $pubkey) = split m/,/;
+  my ($fqdn, $keytype, $pubkey) = split m/,/;
+  next unless (my ($keytype_short) = ($keytype =~ m/ssh(\w+)key/));
   my ($hostname) = ($fqdn =~ m|^(.*?)\.|);
   my $cmd = "env - /usr/bin/host '$fqdn' |";
   open(HOST, $cmd) or die "Cannot run '$cmd': $!";
@@ -69,7 +70,10 @@ while(<U_CAN_TOUCH_THIS>) {
     m/has IPv6 address ([0-9:]+)/ && push(@aliases, "[$1]");
   }
   close(HOST);
-  $? && die "$cmd failed with code $?";
+  if ($?) {
+    warn "$cmd failed with code $?";
+    next;
+  }
 
   # The Puppet master might have an alias on the internal network.
   # TODO: using hammer --search ipaddr, we could drop the assumption
@@ -95,7 +99,7 @@ while(<U_CAN_TOUCH_THIS>) {
   }
 
   my $aliases = join(",", @aliases);
-  print "$aliases ssh-rsa $pubkey\n" or die "Cannot write: $!";
+  print "$aliases ssh-${keytype_short} $pubkey\n" or die "Cannot write: $!";
 }
 
 close(STDOUT) or die "Cannot close: $!";
