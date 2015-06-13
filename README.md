@@ -3,77 +3,89 @@
 #### Table of Contents
 
 1. [Overview](#overview)
-2. [Module Description - What the module does and why it is useful](#module-description)
-3. [Setup - The basics of getting started with clusterssh](#setup)
+2. [Module Description](#module-description)
+3. [Setup](#setup)
     * [What clusterssh affects](#what-clusterssh-affects)
     * [Setup requirements](#setup-requirements)
     * [Beginning with clusterssh](#beginning-with-clusterssh)
-4. [Usage - Configuration options and additional functionality](#usage)
-5. [Reference - An under-the-hood peek at what the module is doing and how](#reference)
-5. [Limitations - OS compatibility, etc.](#limitations)
-6. [Development - Guide for contributing to the module](#development)
+4. [Usage](#usage)
+5. [Limitations](#limitations)
+6. [Development](#development)
 
 ## Overview
 
-A one-maybe-two sentence summary of what the module does/what problem it solves.
-This is your 30 second elevator pitch for your module. Consider including
-OS/Puppet version it works with.
+Make [pdsh](https://code.google.com/p/pdsh/) work on your cluster like so:
+
+    pdsh -g mycluster-all date
+
+[Foreman](http://theforeman.org/) is required - *This module doesn't work with vanilla Puppet*
+
+*WARNING: ALPHA QUALITY!* A number of
+steps that should be automated, still need to be done manually.
+([We](http://sti.epfl.ch/it) are already using this module in one
+production cluster and one development cluster, though - Your mileage
+may vary.)
 
 ## Module Description
 
-If applicable, this section should have a brief description of the technology
-the module integrates with and what that integration enables. This section
-should answer the questions: "What does this module *do*?" and "Why would I use
-it?"
+This module installs and configures
+[`pdsh`](https://code.google.com/p/pdsh/) and
+[ssh host-based authentication](https://en.wikibooks.org/wiki/OpenSSH/Cookbook/Host-based_Authentication)
+in your cluster. It uses Foreman's
+[stored Puppet facts](http://projects.theforeman.org/projects/foreman/wiki/Puppet_Facts)
+feature as the ground truth for host names, IP addresses and public keys.
 
-If your module has a range of functionality (installation, configuration,
-management, etc.) this is the time to mention it.
+Only Red Hat (and CentOS) 6 and 7 are supported at this point.
+
+The following tasks are performed:
+* Manage `/etc/ssh/ssh_known_hosts`, `shosts.equiv`, `/root/.shosts` and `/etc/netgroup` files
+* Optionally, install [`pdsh`](https://code.google.com/p/pdsh/)
+* Manage the required configuration items in `ssh_config` and `sshd_config`, public key permissions etc.
 
 ## Setup
 
 ### What clusterssh affects
 
-* A list of files, packages, services, or operations that the module will alter,
-  impact, or execute on the system it's installed on.
-* This is a great place to stick any warnings.
-* Can be in list or paragraph form.
+* Generate master copies of `ssh_known_hosts`, `shosts.equiv` and (*UNIMPLEMENTED*) `/etc/netgroup` on the Puppet master
+  * For the time being, you still have to create the `netgroup` master by hand under `modules/clusterssh/files/generated/netgroup`
+* Distribute these files on all nodes, also as `/root/.shosts` (required for password-less login for root)
+* Set `netgroup: files` in `/etc/nsswitch.conf`, lest `/etc/netgroup` have no effect
+* Straighten key permissions w.r.t. those of `ssh-keysign(8)` on the distribution (as its name implies, that tool needs to read the private keys)
+* Optionally install [`pdsh`](https://code.google.com/p/pdsh/)
 
-### Setup Requirements **OPTIONAL**
+### Setup Requirements
 
-If your module requires anything extra before setting up (pluginsync enabled,
-etc.), mention it here.
+[Foreman](http://theforeman.org/) is required - *This module doesn't work with vanilla Puppet*
 
 ### Beginning with clusterssh
 
-The very basic steps needed for a user to get the module up and running.
+    puppet module install epflsti/clusterssh
 
-If your most recent release breaks compatibility or requires particular steps
-for upgrading, you may wish to include an additional section here: Upgrading
-(For an example, see http://forge.puppetlabs.com/puppetlabs/firewall).
+
+    class { 'clusterssh': }
 
 ## Usage
 
-Put the classes, types, and resources for customizing, configuring, and doing
-the fancy stuff with your module here.
+    class { 'clusterssh':
+      role => $role,  # "agent", "master" or "autodetect"
+      manage_nsswitch_netgroup => $boolean,
+      manage_pdsh_packages => $boolean,
+      enable_root_shosts_equiv => $boolean
+    }
 
-## Reference
-
-Here, list the classes, types, providers, facts, etc contained in your module.
-This section should include all of the under-the-hood workings of your module so
-people know what the module is touching on their system but don't need to mess
-with things. (We are working on automating this section!)
+See
+[the documentation header in `init.pp`](https://github.com/epfl-sti/puppet.clusterssh/blob/master/manifests/init.pp)
+for details.
 
 ## Limitations
 
-This is where you list OS compatibility, version compatibility, etc.
+[Foreman](http://theforeman.org/) is required - *This module doesn't work with vanilla Puppet*
+
+Only Red Hat (and CentOS) 6 and 7 are supported at this point.
 
 ## Development
 
-Since your module is awesome, other users will want to play with it. Let them
-know what the ground rules for contributing are.
+Please fork
+[the GitHub project](https://github.com/epfl-sti/puppet.clusterssh/)
+and create a pull request on GitHub.
 
-## Release Notes/Contributors/Etc **Optional**
-
-If you aren't using changelog, put your release notes here (though you should
-consider using changelog). You may also add any additional sections you feel are
-necessary or important to include here. Please use the `## ` header.
