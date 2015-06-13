@@ -108,7 +108,8 @@ sub add_name {
 sub all_names {
   my ($self) = @_;
   my %names_set = map {$_ => 1} ($self->{fqdn}, @{$self->{aliases}});
-  return sort keys %names_set;
+  # Sort letters before numbers:
+  return reverse sort keys %names_set;
 }
 
 sub add_key {
