@@ -20,9 +20,13 @@ format.
 
 use Getopt::Long;
 use Carp qw(carp);
+use autodie;
 
 # Attempt to save stderr somewhere - No biggie if that fails
-open(STDERR, "> /var/log/puppet/gen-known_hosts.log");
+eval {
+  open(STDERR, "> /var/log/puppet/gen-known_hosts.log")
+    unless $ENV{TERM};
+};
 
 sub logmsg {
   my $now = localtime(time);
@@ -37,69 +41,113 @@ if (! defined $ENV{HOME}) {
 
 chomp(my $puppetmaster_fqdn = `facter fqdn`);
 
-do {
-  open(U_CAN_TOUCH_THIS,
-     "hammer --output csv fact list --search ssh --search key --per-page 1000 |" .
-       " sort |");
-} or die "Stop! No hammertime: $!";
+my $key_source = HammerSource->open(qw(ssh key));
 
 # Redirect only now, so that the file doesn't get created in case of failure
-our $outputfile;
+our ($outputfile, $outputfile_unique);
 GetOptions("o=s" => sub {
   (undef, $outputfile) = @_;
-  logmsg "Redirecting to $outputfile";
-  open(STDOUT, ">", $outputfile) or
-    die "Cannot open $outputfile for writing: $!";
+  $outputfile_unique = "${outputfile}.$$";
+  logmsg "Redirecting to $outputfile_unique";
+  open(STDOUT, ">", $outputfile_unique);  # autodie
 });
 
 END {
-  unlink($outputfile) if ($? && $outputfile);
+  unlink($outputfile_unique) if ($? && $outputfile_unique);
 }
 
-while(<U_CAN_TOUCH_THIS>) {
-  chomp;
-  next if m/,Fact,/;  # Header line
-  my ($fqdn, $keytype, $pubkey) = split m/,/;
+while(my ($fqdn, $keytype, $pubkey) = $key_source->next) {
   next unless (my ($keytype_short) = ($keytype =~ m/ssh(\w+)key/));
-  my ($hostname) = ($fqdn =~ m|^(.*?)\.|);
-  my $cmd = "env - /usr/bin/host '$fqdn' |";
-  open(HOST, $cmd) or die "Cannot run '$cmd': $!";
-  my @aliases = ($fqdn, $hostname);
-  while(<HOST>) {
-    m/has address ([0-9.]+)/ && push(@aliases, $1);
-    m/has IPv6 address ([0-9:]+)/ && push(@aliases, "[$1]");
-  }
-  close(HOST);
-  if ($?) {
-    warn "$cmd failed with code $?";
-  }
-
-  # The Puppet master might have an alias on the internal network.
-  # TODO: using hammer --search ipaddr, we could drop the assumption
-  # that only the Puppet master can be multi-homed.
-  if ($fqdn eq $puppetmaster_fqdn) {
-    open(FACTER, "facter |") or die "facter doesn't deliver: $!";
-    while(<FACTER>) {
-      chomp;
-      next unless (m/ipaddress.* => ((?:[0-9]+[.]){3}[0-9]+)/);
-      my $maybe_internal_ip = $1;
-      chomp(my $gethostbyaddr = `getent hosts $maybe_internal_ip`);
-      unless ($gethostbyaddr =~ m/[0-9.]+\s+(\S+)/) {
-        logmsg "Unable to getent hosts $maybe_internal_ip (result: $gethostbyaddr)";
-        next;
-      };
-      my $another_fqdn = $1;
-      next if $another_fqdn =~ m/localhost/;
-      next if grep { $_ eq $another_fqdn } @aliases;
-      push @aliases, $maybe_internal_ip, $another_fqdn;
-      my ($another_hostname) = ($another_fqdn =~ m|^(.*?)\.|);
-      push @aliases, $another_hostname;
-    }
-  }
-
-  my $aliases = join(",", @aliases);
-  print "$aliases ssh-${keytype_short} $pubkey\n" or die "Cannot write: $!";
+  my $host = Host->find($fqdn);
+  $host->add_key($keytype_short, $pubkey);
+  my ($short_hostname) = ($fqdn =~ m|^(.*?)\.|);
+  $host->add_name($short_hostname);
 }
 
-close(STDOUT) or die "Cannot close: $!";
+# Don't trust the bare "ipaddress" fact, as Docker messes it up!
+# Always read all IPs, find out which ones look legit
+my $ipaddress_source = HammerSource->open("ipaddress_");
+while(my ($fqdn, $factname, $addr) = $ipaddress_source->next) {
+  my ($ifname) = $factname =~ m/^ipaddress_(.*)$/;
+  next unless $ifname;
+  next if $ifname eq "lo";
+  next if $addr =~ m/^172\.1[67]/;
+  next if $addr =~ m/^127/;
+  next if $addr =~ m/^169\.254/;
+  Host->find($fqdn)->add_name($addr);
+}
+
+foreach my $host (Host->all) {
+  my $aliases = join(",", $host->all_names);
+  foreach my $keystruct ($host->all_keys) {
+    my ($keytype_short, $pubkey) = @$keystruct;
+    print "$aliases $keytype_short $pubkey\n";  # autodie
+  }
+}
+
+close(STDOUT); # autodie, also next line
+rename($outputfile_unique, $outputfile) if $outputfile;
 exit 0;
+
+package Host;
+
+use vars qw(%all_hosts);
+
+sub find {
+  my ($class, $fqdn) = @_;
+  $all_hosts{$fqdn} ||= bless {
+    fqdn => $fqdn, keys => {}, aliases => []
+  }, $class;
+}
+
+sub add_name {
+  my ($self, $name) = @_;
+  push @{$self->{aliases}}, $name;
+}
+
+sub all_names {
+  my ($self) = @_;
+  my %names_set = map {$_ => 1} ($self->{fqdn}, @{$self->{aliases}});
+  return sort keys %names_set;
+}
+
+sub add_key {
+  my ($self, $keytype, $key) = @_;
+  $self->{keys}->{$keytype} = $key;
+}
+
+sub all_keys {
+  my ($self) = @_;
+  return map { [$_ => $self->{keys}->{$_}] }
+    (sort keys %{$self->{keys}});
+}
+
+sub all {
+  my ($class) = @_;
+  return map { $all_hosts{$_} } (sort keys %all_hosts);
+}
+
+package HammerSource;
+
+use IO::File;
+
+sub open {
+  my ($class, @searched) = @_;
+  my $u_can_touch_this = new IO::File(sprintf(
+    'unset LANG LC_ALL LC_LANGUAGE; $(which hammer) --output csv fact list %s --per-page 10000 |',
+    join(" ", map {" --search '$_'"} @searched)));
+  die "Stop! No hammertime: $!" if ! $u_can_touch_this;
+  bless { _mc => $u_can_touch_this }, $class;
+}
+
+sub next {
+  my ($self) = @_;
+  for(1) {
+    local $_ = $self->{_mc}->getline;
+    return if ! defined;
+    chomp;
+    redo if m/,Fact,/;  # Header line
+    my @bits = split m/,/;
+    return @bits;
+  }
+}
