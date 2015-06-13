@@ -72,7 +72,6 @@ while(<U_CAN_TOUCH_THIS>) {
   close(HOST);
   if ($?) {
     warn "$cmd failed with code $?";
-    next;
   }
 
   # The Puppet master might have an alias on the internal network.
