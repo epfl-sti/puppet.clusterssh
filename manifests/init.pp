@@ -86,6 +86,13 @@ class clusterssh(
     class { "clusterssh::private::install_pdsh": }
   }
 
+  if ($::operatingsystem == "RedHat" and $::operatingsystemmajrelease >= 7) {
+    file { ["/etc/ssh/ssh_host_rsa_key", "/etc/ssh/ssh_host_dsa_key"]:
+      group => "ssh_keys",
+      mode => 0640
+    }
+  }
+
   if ($::operatingsystem == "RedHat" or $::operatingsystem == "CentOS") {
     $sshd_service = "sshd"
   } else {
