@@ -57,6 +57,8 @@ END {
 }
 
 while(my ($fqdn, $keytype, $pubkey) = $key_source->next) {
+  next if (! $fqdn);
+  next if ($fqdn eq '""');
   next unless (my ($keytype_short) = ($keytype =~ m/ssh(\w+)key/));
   my $host = Host->find($fqdn);
   $host->add_key($keytype_short, $pubkey);
