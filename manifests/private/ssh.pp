@@ -11,7 +11,9 @@
 # See also:
 #
 # http://serverfault.com/a/391467/109290
-class clusterssh::private::ssh {
+class clusterssh::private::ssh(
+  $enable_root_shosts_equiv = false
+) {
   case $::osfamily {
     "RedHat": {
       $sshd_service = "sshd"

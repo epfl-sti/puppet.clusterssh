@@ -78,7 +78,9 @@ class clusterssh(
     }
   }
 
-  class { "clusterssh::private::ssh": }
+  class { "clusterssh::private::ssh":
+    enable_root_shosts_equiv => $enable_root_shosts_equiv
+  }
   class { "clusterssh::private::ssh_keys": }
   if ($install_pdsh) {
     class { "clusterssh::private::install_pdsh": }
@@ -97,10 +99,18 @@ class clusterssh(
     }
   }
   define shosts_equiv($hosts) {
-    file { '/etc/ssh/shosts.equiv':
-      content => inline_template('<% @hosts.map { |h| h["certname"] rescue h }.sort.uniq.each do |host| -%>
+    $shosts_contents = inline_template('<% @hosts.map { |h| h["certname"] rescue h }.sort.uniq.each do |host| -%>
 <%= host %>
 <% end %>')
+    file { '/etc/ssh/shosts.equiv':
+      content => $shosts_contents
+    }
+
+    if ($clusterssh::enable_root_shosts_equiv) {
+      file { '/root/.shosts':
+        content => $shosts_contents,
+        mode    => "0644"
+      }
     }
   }
 }
