@@ -2,78 +2,74 @@
 #
 # Set up /etc/netgroup and SSH host-based authentication for pdsh bliss.
 #
-# === Parameters
+# === Parameters:
 #
-# [*role*]
-#   Either "agent", "puppetmaster", or "autodetect" (the latter, according
-#   to whether Foreman's hammer tool is installed)
 # [*manage_nsswitch_netgroup*] 
 #   Whether to manage the netgroup entry in nsswitch.conf.
 #   Set to false to let e.g. domq/epfl_sso set this entry.
-# [*manage_pdsh_packages*] 
+#
+# [*install_pdsh*]
 #   Whether to manage the installation of pdsh and pdsh-mod-netgroup.
 #   Set this to false if you manage this packages by yourself, or if
 #   you don't want to install pdsh.
+#
 # [*enable_root_shosts_equiv*] 
-#   Boolean, whether to allow root to log in from one node to another
-#   without providing a password.
+#   Boolean, whether to make clusterssh::shosts_equiv also work for root.
 #
 # === Actions:
-# * Runs hammer (Foreman's CLI) on the Puppet master to enumerate known hosts
-# * Creates known_hosts and shosts.equiv file inside this module's files/generated
-#   directory on the puppetmaster
-# * Distributes these files (plus netgroup if present) onto all slaves
 #
+# * Ensure sshd is running and configured for host-based authentication,
+#   so that all accounts are equivalent (in the /etc/shosts.equiv sense)
+#
+# * (Optionally) Install pdsh
+#
+# * Do *NOT* change shosts.equiv or /etc/netgroup. For that, you have
+#   to invoke a define explicitly.
+#
+# === Defines:
+#
+# ==== clusterssh::netgroup
+#
+# Define a netgroup in /etc/netgroup (for pdsh -g).
+#
+# For example, putting
+# the following in your code makes "pdsh -g my-compute-nodes" work:
+# (thanks to the puppetdb_query function that comes with puppetdb;
+# see https://docs.puppet.com/puppetdb/latest/api/query/tutorial.html)
+#
+# clusterssh::netgroup { "my-compute-nodes":
+#   hosts = puppetdb_query(["from", "nodes", ["~", "certname", "compute"]])
+# }
+#
+# `hosts` can be either a list of host names, or a list of things that have
+# a `.certname` (like the result of a `puppetdb_query` in ["from", "nodes"]
+# or ["from", "facts"] - Duplicates are permitted and eliminated)
+#
+# ==== clusterssh::shosts_equiv
+#
+# Make these hosts part of /etc/ssh/shosts.equiv. This defined type can
+# only be called once.
+#
+# For example, putting
+# the following in your code makes "pdsh -g my-compute-nodes" work:
+# (thanks to the puppetdb_query function that comes with puppetdb;
+# see https://docs.puppet.com/puppetdb/latest/api/query/tutorial.html)
+#
+# clusterssh::shosts_equiv { "all":  # Name doesn't matter
+#   hosts => puppetdb_query(["from", "nodes"])
+# }
+#
+# `hosts` can be either a list of host names, or a list of things that have
+# a `.certname` (like the result of a `puppetdb_query` in ["from", "nodes"]
+# or ["from", "facts"] - Duplicates are permitted and eliminated)
+
 class clusterssh(
-  $role = "autodetect",
   $manage_nsswitch_netgroup = true,
-  $manage_pdsh_packages = true,
+  $install_pdsh = true,
   $enable_root_shosts_equiv = true
 ) {
-  validate_re($role, '^agent$|^puppetmaster$|^autodetect$')
   validate_bool($manage_nsswitch_netgroup)
-  validate_bool($manage_pdsh_packages)
-
-  if ($role == "autodetect") {
-    if ($::has_hammer == "true") {
-      $resolved_role = "puppetmaster"
-    } else {
-      $resolved_role = "agent"
-    }
-  } else {
-    $resolved_role = $role
-  }
-
-  if ($resolved_role == "puppetmaster") {
-    # Bag of ugly tricks to do the simplest thing, despite the efforts
-    # of Puppet to prevent it: create a config file from a script.
-    #
-    # * Put the output in the source tree of the module (under files/), it being the
-    #   only place where it can be downloaded from on slave nodes
-    # * trick exec() into not knowing that the script runs every time (otherwise
-    #   the master node would never go green again in the Foreman dashboard)
-    #
-    $module_path = get_module_path("clusterssh")
-    exec { "/bin/false # clusterssh gen-known_hosts.pl":
-      unless => "${module_path}/scripts/gen-known_hosts.pl -o ${module_path}/files/generated/ssh_known_hosts",
-    } ->
-    exec { "/bin/false # clusterssh gen-shosts_equiv.pl":
-      unless => "${module_path}/scripts/gen-shosts_equiv.pl -i ${module_path}/files/generated/ssh_known_hosts -o ${module_path}/files/generated/shosts.equiv",
-    }
-
-    # TODO: generate netgroup file too (requires additional class parameters)
-  }
-
-  include('clusterssh::private')
-  clusterssh::private::sync_file_from_puppetmaster { "ssh_known_hosts":
-    path => "/etc/ssh/ssh_known_hosts"
-  }
-  clusterssh::private::sync_file_from_puppetmaster { "netgroup":
-    path => "/etc/netgroup"
-  }
-  clusterssh::private::sync_file_from_puppetmaster { "shosts.equiv":
-    path => "/etc/ssh/shosts.equiv"
-  }
+  validate_bool($install_pdsh)
 
   if ($manage_nsswitch_netgroup) {
     name_service { 'netgroup':
@@ -82,40 +78,29 @@ class clusterssh(
     }
   }
 
-  if ($manage_pdsh_packages) {
+  class { "clusterssh::private::ssh": }
+  class { "clusterssh::private::ssh_keys": }
+  if ($install_pdsh) {
     class { "clusterssh::private::install_pdsh": }
   }
 
-  if ($::operatingsystem == "RedHat" and $::operatingsystemmajrelease >= 7) {
-    file { ["/etc/ssh/ssh_host_rsa_key", "/etc/ssh/ssh_host_dsa_key"]:
-      group => "ssh_keys",
-      mode => 0640
+
+  define netgroup($hosts) {
+    exec { "touch /etc/netgroup # for ${title}":
+      path => $::path,
+      creates => "/etc/netgroup"
+    } ->
+    file_line { "${title} in /etc/netgroup":
+      path => '/etc/netgroup',
+      match => "^${title} ",
+      line => inline_template('<%=@title %><% @hosts.map { |h| h["certname"] rescue h }.sort.uniq.each do |host | %> (<%= host %>,,)<% end %>')
     }
   }
-
-  if ($::operatingsystem == "RedHat" or $::operatingsystem == "CentOS") {
-    $sshd_service = "sshd"
-  } else {
-    $sshd_service = "ssh"
-  }
-  ensure_resource("service", $sshd_service, { ensure => 'running'})
-
-  # https://en.wikibooks.org/wiki/OpenSSH/Cookbook/Host-based_Authentication
-  clusterssh::private::set_sshd_config { "HostbasedAuthentication":
-    notify => Service[$sshd_service]
-  }
-  clusterssh::private::set_ssh_config {
-    ["HostbasedAuthentication", "EnableSSHKeysign", "ForwardX11"]:
-  }
-  if ($enable_root_shosts_equiv) {
-    # http://brandonhutchinson.com/wiki/Ssh_HostbasedAuthentication#HostbasedAuthentication_with_the_root_user
-    clusterssh::private::set_sshd_config { "IgnoreRhosts":
-      value => "no",
-      notify => Service[$sshd_service]
-    }
-    clusterssh::private::sync_file_from_puppetmaster { "/root/.shosts":
-      filename => "shosts.equiv",
-      path => "/root/.shosts"
+  define shosts_equiv($hosts) {
+    file { '/etc/ssh/shosts.equiv':
+      content => inline_template('<% @hosts.map { |h| h["certname"] rescue h }.sort.uniq.each do |host| -%>
+<%= host %>
+<% end %>')
     }
   }
 }

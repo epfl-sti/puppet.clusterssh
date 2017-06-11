@@ -1,7 +1,7 @@
 {
-  "name": "domq-clusterssh",
-  "version": "0.5.0",
-  "author": "domq",
+  "name": "epflsti-clusterssh",
+  "version": "0.6.0",
+  "author": "epflsti",
   "summary": "ssh from anywhere to anywhere in the Puppet cluster",
   "license": "MIT",
   "source": "https://github.com/epfl-sti/puppet.clusterssh",
